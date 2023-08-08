@@ -71,6 +71,7 @@ namespace ompl
                 DUBINS_STRAIGHT = 1,
                 DUBINS_RIGHT = 2
             };
+
             /** \brief Dubins path types */
             static const DubinsPathSegmentType dubinsPathType[6][3];
             /** \brief Complete description of a Dubins path */
@@ -127,6 +128,8 @@ namespace ompl
             {
                 return isSymmetric_;
             }
+
+            unsigned int validSegmentCount(const State *state1, const State *state2) const override;
 
             void sanityChecks() const override
             {

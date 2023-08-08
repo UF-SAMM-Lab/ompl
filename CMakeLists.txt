@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
-project(ompl VERSION 1.5.2 LANGUAGES CXX)
-set(OMPL_ABI_VERSION 16)
+project(ompl VERSION 1.6.0 LANGUAGES CXX)
+set(OMPL_ABI_VERSION 17)
 
 # set the default build type
 if (NOT CMAKE_BUILD_TYPE)
@@ -48,9 +48,7 @@ set_package_properties(Boost PROPERTIES
     URL "https://www.boost.org"
     PURPOSE "Used throughout OMPL for data serialization, graphs, etc.")
 set(Boost_USE_MULTITHREADED ON)
-set(Boost_NO_BOOST_CMAKE ON)
-find_package(Boost 1.58 QUIET REQUIRED COMPONENTS serialization filesystem system program_options)
-include_directories(SYSTEM ${Boost_INCLUDE_DIR})
+find_package(Boost 1.58 REQUIRED COMPONENTS serialization filesystem system program_options)
 
 # Add support in Boost::Python for std::shared_ptr
 # This is a hack that replaces boost::shared_ptr related code with std::shared_ptr.
@@ -65,7 +63,7 @@ if (NOT Boost_VERSION_STRING)
     endif()
 endif()
 if(Boost_VERSION_STRING VERSION_LESS "1.63.0")
-    include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src/external")
+    include_directories(SYSTEM "${CMAKE_CURRENT_SOURCE_DIR}/src/external")
 endif()
 
 
@@ -110,22 +108,10 @@ set_package_properties(Eigen3 PROPERTIES
     URL "http://eigen.tuxfamily.org"
     PURPOSE "A linear algebra library used throughout OMPL.")
 find_package(Eigen3 REQUIRED)
-include_directories("${EIGEN3_INCLUDE_DIR}")
-
-set_package_properties(MORSE PROPERTIES
-    URL "https://www.openrobots.org/wiki/morse"
-    PURPOSE "OMPL includes a plugin for the MORSE Robot Simulation engine.")
-find_package(MORSE QUIET)
-set(OMPL_EXTENSION_MORSE ${MORSE_FOUND})
-
-set_package_properties(ODE PROPERTIES
-    URL "http://ode.org"
-    PURPOSE "The Open Dynamics Engine can be used as a \"black box\" for kinodynamic planning.")
-find_package(ODE QUIET)
-set(OMPL_EXTENSION_ODE ${ODE_FOUND})
-if (OMPL_EXTENSION_ODE)
-  include_directories(${ODE_INCLUDE_DIRS})
-endif()
+if (NOT DEFINED EIGEN3_INCLUDE_DIR)
+    get_target_property(EIGEN3_INCLUDE_DIR Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
+endif ()
+include_directories(SYSTEM "${EIGEN3_INCLUDE_DIR}")
 
 set_package_properties(Triangle PROPERTIES
     URL "http://www.cs.cmu.edu/~quake/triangle.html"
@@ -133,7 +119,7 @@ set_package_properties(Triangle PROPERTIES
 find_package(Triangle QUIET)
 set(OMPL_EXTENSION_TRIANGLE ${TRIANGLE_FOUND})
 if (OMPL_EXTENSION_TRIANGLE)
-  include_directories(${TRIANGLE_INCLUDE_DIR})
+  include_directories(SYSTEM ${TRIANGLE_INCLUDE_DIR})
 endif()
 
 set_package_properties(flann PROPERTIES
@@ -142,7 +128,7 @@ set_package_properties(flann PROPERTIES
 find_package(flann 1.8.3 QUIET)
 if (FLANN_FOUND)
     set(OMPL_HAVE_FLANN 1)
-    include_directories("${FLANN_INCLUDE_DIRS}")
+    include_directories(SYSTEM ${FLANN_INCLUDE_DIRS})
     link_directories(${FLANN_LIBRARY_DIRS})
 endif()
 
@@ -152,7 +138,7 @@ set_package_properties(spot PROPERTIES
 find_package(spot)
 if (spot_FOUND)
     set(OMPL_HAVE_SPOT 1)
-    include_directories("${SPOT_INCLUDE_DIRS}")
+    include_directories(SYSTEM "${SPOT_INCLUDE_DIRS}")
     link_directories(${SPOT_LIBRARY_DIRS})
 endif()
 
@@ -168,7 +154,7 @@ if(PYTHON_FOUND AND NOT Boost_VERSION_STRING VERSION_LESS "1.63.0")
         find_boost_numpy()
         if(Boost_NUMPY_LIBRARY)
             set(OMPL_HAVE_NUMPY 1)
-            include_directories("${PY_NUMPY}/core/include")
+            include_directories(SYSTEM "${PY_NUMPY}/core/include")
         endif()
     endif()
 endif()
@@ -194,9 +180,6 @@ if(NOT MSVC)
     set(PKG_NAME "ompl")
     set(PKG_DESC "The Open Motion Planning Library")
     set(PKG_EXTERNAL_DEPS "eigen3 ${ompl_PKG_DEPS}")
-    if(OMPL_EXTENSION_ODE)
-        set(PKG_EXTERNAL_DEPS "${PKG_EXTERNAL_DEPS}")
-    endif()
     set(PKG_OMPL_LIBS "-lompl ${ompl_LINK_FLAGS}")
     configure_file("${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules/ompl.pc.in"
                    "${CMAKE_CURRENT_BINARY_DIR}/ompl.pc" @ONLY)
@@ -205,6 +188,7 @@ if(NOT MSVC)
         COMPONENT ompl)
 endif()
 
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
 include(CMakePackageConfigHelpers)
 set(INCLUDE_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR})
 set(LIB_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR})

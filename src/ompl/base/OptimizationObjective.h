@@ -42,7 +42,10 @@
 #include "ompl/util/ClassForward.h"
 #include "ompl/base/ProblemDefinition.h"
 #include "ompl/base/samplers/InformedStateSampler.h"
+// This is needed to correctly generate the python bindings
+#ifndef __castxml__
 #include "ompl/control/Control.h"
+#endif
 
 #include <functional>
 #include <iostream>
@@ -116,9 +119,12 @@ namespace ompl
             /** \brief Get the cost that corresponds to the motion segment between \e s1 and \e s2 */
             virtual Cost motionCost(const State *s1, const State *s2) const = 0;
 
+// This is needed to correctly generate the python bindings
+#ifndef __castxml__
             /** \brief Get the cost that corresponds to the motion created by a control \e c applied for duration \e steps.
              * The default implementation uses the identityCost. */
             virtual Cost controlCost(const control::Control *c, unsigned int steps) const;
+#endif
 
             /** \brief Get the cost that corresponds to combining the costs \e c1 and \e c2. Default implementation
              * defines this combination as an addition. */
@@ -169,6 +175,11 @@ namespace ompl
              * speed up planning. The default implementation of this method returns this objective's identity cost,
              * which is sure to be an admissible heuristic if there are no negative costs. */
             virtual Cost motionCostHeuristic(const State *s1, const State *s2) const;
+
+            /** \brief Defines a possibly inadmissible estimate on the optimal cost on the motion between states \e s1 and \e s2.
+             * An inadmissible estimate does not always undervalue the true optimal cost of the motion. Used by some planners to
+             * speed up planning. The default implementation of this method returns this objective's identity cost. */
+            virtual Cost motionCostBestEstimate(const State *s1, const State *s2) const;
 
             /** \brief Returns this objective's SpaceInformation. Needed for operators in MultiOptimizationObjective */
             const SpaceInformationPtr &getSpaceInformation() const;

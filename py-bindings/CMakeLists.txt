@@ -17,10 +17,7 @@ if (OMPL_BUILD_PYBINDINGS)
         add_definitions(-DOMPL_BASE_STATE_STORAGE_ -DOMPL_BASE_PLANNER_DATA_STORAGE_ -DOMPL_CONTROL_PLANNER_DATA_STORAGE_)
     endif(WIN32)
 
-    set(OMPL_MODULES base control geometric tools util)
-    if(OMPL_EXTENSION_MORSE)
-        list(APPEND OMPL_MODULES morse)
-    endif()
+    set(OMPL_MODULES util base control geometric tools)
 
     if(PY_OMPL_GENERATE)
         # need to run cmake to regenerate ompl/bindings_generator.py if
@@ -34,22 +31,14 @@ if (OMPL_BUILD_PYBINDINGS)
         else()
             create_module_generation_targets(base "[Cc]onstrain")
         endif()
-        create_module_generation_targets(geometric)
-        create_module_generation_targets(control)
-        create_module_generation_targets(tools)
-        if(OMPL_EXTENSION_MORSE)
-            create_module_generation_targets(morse)
-        endif()
-
         add_dependencies(update_base_bindings update_util_bindings)
+        create_module_generation_targets(geometric)
         add_dependencies(update_geometric_bindings update_base_bindings)
+        create_module_generation_targets(control)
         add_dependencies(update_control_bindings update_geometric_bindings)
         add_dependencies(update_control_bindings update_base_bindings)
+        create_module_generation_targets(tools)
         add_dependencies(update_tools_bindings update_control_bindings)
-        if(OMPL_EXTENSION_MORSE)
-            add_dependencies(update_morse_bindings update_base_bindings)
-            add_dependencies(update_morse_bindings update_control_bindings)
-        endif()
     endif(PY_OMPL_GENERATE)
 
     if(PY_OMPL_COMPILE AND EXISTS "${CMAKE_CURRENT_BINARY_DIR}/bindings")
@@ -65,8 +54,7 @@ if (OMPL_BUILD_PYBINDINGS)
             PATTERN "*.pyc" EXCLUDE
             PATTERN "__pycache__" EXCLUDE
             PATTERN "_*.so" EXCLUDE
-            PATTERN "app" EXCLUDE
-            PATTERN "morse" EXCLUDE)
+            PATTERN "app" EXCLUDE)
         # put app submodule in omplapp component
         if(PROJECT_NAME STREQUAL "omplapp")
             install(DIRECTORY ompl/app
@@ -75,21 +63,6 @@ if (OMPL_BUILD_PYBINDINGS)
                 PATTERN "*.pyc" EXCLUDE
                 PATTERN "__pycache__" EXCLUDE
                 PATTERN "_*.so" EXCLUDE)
-        endif()
-        # put morse submodule in morse component
-        if(OMPL_EXTENSION_MORSE)
-            install(DIRECTORY ompl/morse
-                DESTINATION "${OMPL_PYTHON_INSTALL_DIR}/ompl"
-                COMPONENT morse
-                PATTERN "*.pyc" EXCLUDE
-                PATTERN "__pycache__" EXCLUDE
-                PATTERN "_*.so" EXCLUDE
-                PATTERN "addons" EXCLUDE)
-            # blender add-on
-            install(DIRECTORY ompl/morse/addons
-                DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/ompl"
-                COMPONENT morse
-                PATTERN "*.pyc" EXCLUDE)
         endif()
     endif()
 

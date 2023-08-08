@@ -32,21 +32,6 @@ file(GLOB_RECURSE OMPL_HEADERS datastructures/*.h util/*.h base/*.h
 #
 #endif()
 
-if (OMPL_EXTENSION_MORSE)
-    file(GLOB_RECURSE OMPL_MORSE_EXTENSION_SOURCE_CODE extensions/morse/*.cpp)
-    file(GLOB_RECURSE OMPL_MORSE_EXTENSION_HEADERS extensions/morse/*.h)
-    set(OMPL_SOURCE_CODE ${OMPL_SOURCE_CODE} ${OMPL_MORSE_EXTENSION_SOURCE_CODE})
-    set(OMPL_HEADERS ${OMPL_HEADERS} ${OMPL_MORSE_EXTENSION_HEADERS})
-endif()
-
-if (OMPL_EXTENSION_ODE)
-    file(GLOB_RECURSE OMPL_ODE_EXTENSION_SOURCE_CODE extensions/ode/*.cpp)
-    file(GLOB_RECURSE OMPL_ODE_EXTENSION_HEADERS extensions/ode/*.h)
-    set(OMPL_SOURCE_CODE ${OMPL_SOURCE_CODE} ${OMPL_ODE_EXTENSION_SOURCE_CODE})
-    set(OMPL_HEADERS ${OMPL_HEADERS} ${OMPL_ODE_EXTENSION_HEADERS})
-    list(APPEND OMPL_LINK_LIBRARIES "${ODE_LIBRARIES}")
-endif()
-
 if (OMPL_EXTENSION_TRIANGLE)
     file(GLOB_RECURSE OMPL_TRIANGLE_EXTENSION_SOURCE_CODE extensions/triangle/*.cpp)
     file(GLOB_RECURSE OMPL_TRIANGLE_EXTENSION_HEADERS extensions/triangle/*.h)
@@ -61,16 +46,17 @@ source_group("OMPL Headers" FILES "${OMPL_HEADERS}")
 # build the library
 if(MSVC)
     add_library(ompl STATIC ${OMPL_SOURCE_CODE})
-else(MSVC)
+else()
     add_library(ompl SHARED ${OMPL_SOURCE_CODE})
 endif(MSVC)
 add_dependencies(ompl ${catkin_EXPORTED_TARGETS})
 target_link_libraries(ompl
     ${OMPL_LINK_LIBRARIES}
-    ${Boost_SERIALIZATION_LIBRARY}
-    ${Boost_FILESYSTEM_LIBRARY}
-    ${Boost_SYSTEM_LIBRARY}
     ${CMAKE_THREAD_LIBS_INIT}
+    Boost::filesystem
+    Boost::program_options
+    Boost::serialization
+    Boost::system
     ${catkin_LIBRARIES})
 
 if (OMPL_EXTENSION_ODE)
