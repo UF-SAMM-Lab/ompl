@@ -38,24 +38,24 @@
 #include <memory>
 #include "ompl/base/samplers/informed/PathLengthDirectInfSampler.h"
 
-ompl::base::ROPPathLengthOptimizationObjective::ROPPathLengthOptimizationObjective(const SpaceInformationPtr &si)
-  : ompl::base::OptimizationObjective(si)
-{
-    description_ = "Path Length";
+// ompl::base::ROPPathLengthOptimizationObjective::ROPPathLengthOptimizationObjective(const SpaceInformationPtr &si)
+//   : ompl::base::OptimizationObjective(si)
+// {
+//     description_ = "Path Length";
 
-    // Setup a default cost-to-go heuristics:
-    setCostToGoHeuristic(base::goalRegionCostToGo);
-}
+//     // Setup a default cost-to-go heuristics:
+//     setCostToGoHeuristic(base::goalRegionCostToGo);
+// }
 
 ompl::base::Cost ompl::base::ROPPathLengthOptimizationObjective::stateCost(const State *) const
 {
     return identityCost();
 }
 
-ompl::base::Cost ompl::base::ROPPathLengthOptimizationObjective::motionCost(const State *s1, const State *s2) const
-{
-    return Cost(si_->distance(s1, s2));
-}
+// ompl::base::Cost ompl::base::ROPPathLengthOptimizationObjective::motionCost(const State *s1, const State *s2) const
+// {
+//     return Cost(si_->distance(s1, s2));
+// }
 
 ompl::base::Cost ompl::base::ROPPathLengthOptimizationObjective::motionCostHeuristic(const State *s1,
                                                                                   const State *s2) const
@@ -78,21 +78,22 @@ ompl::base::ROPPathLengthOptimizationObjective::ROPPathLengthOptimizationObjecti
 
     // Setup a default cost-to-go heuristics:
     setCostToGoHeuristic(base::goalRegionCostToGo);
+    dimension_ = si_->getStateDimension();
 
-    name="rop metrics";
+    // name="rop metrics";
 
     urdf::Model robo_model;
     robo_model.initParam("robot_description");
     std::string base_frame_ = "world";
     std::string tool_frame = "tip";
-    if (!nh_.getParam("base_frame", base_frame_))
+    if (!nh_.getParam("/ROPE/base_frame", base_frame_))
     {
-        ROS_ERROR("%s/base_frame not defined", nh_.getNamespace().c_str());
+        ROS_ERROR("/ROPE/base_frame not defined");
         throw std::invalid_argument("base_frame is not defined");
     }
-    if (!nh_.getParam("tool_frame", tool_frame))
+    if (!nh_.getParam("/ROPE/tool_frame", tool_frame))
     {
-        ROS_ERROR("%s/tool_frame not defined", nh_.getNamespace().c_str());
+        ROS_ERROR("/ROPE/tool_frame not defined");
         throw std::invalid_argument("base_frame is not defined");
     }
 
@@ -101,14 +102,14 @@ ompl::base::ROPPathLengthOptimizationObjective::ROPPathLengthOptimizationObjecti
     //   ROS_WARN_STREAM("/avoid_prob_threshold not defined, using "<<prob_threshold);
     // }
     
-    if (!nh_.getParam("links_for_rop", links_to_check))
+    if (!nh_.getParam("/ROPE/links_for_rop", links_to_check))
     {
-        ROS_ERROR("%s/links_for_rop not defined", nh_.getNamespace().c_str());
+        ROS_ERROR("/ROPE/links_for_rop not defined");
         throw std::invalid_argument("links_for_rop is not defined");
     }  
-    if (!nh_.getParam("rop_resolution", m_resolution))
+    if (!nh_.getParam("/ROPE/rop_resolution", m_resolution))
     {
-        ROS_WARN_STREAM("/rop_resolution not defined, using "<<m_resolution);
+        ROS_WARN_STREAM("/ROPE/rop_resolution not defined, using "<<m_resolution);
     }
     
     Eigen::Vector3d grav;
@@ -116,10 +117,13 @@ ompl::base::ROPPathLengthOptimizationObjective::ROPPathLengthOptimizationObjecti
     chain = rosdyn::createChain(robo_model, base_frame_, tool_frame, grav);
     
     link_names=chain->getLinksName();
+    for (int i=0;i<link_names.size();i++) std::cout<<link_names[i]<<", ";
+    std::cout<<std::endl;
     Eigen::VectorXd q;
-    q.resize(link_names.size());
+    q.resize(dimension_);
     q.setZero();
     m_transformations=chain->getTransformations(q);
+    std::cout<<m_transformations.size()<<std::endl;
     int n_pts = 0;
     for (std::string link_name:links_to_check) {
         int it = std::find(link_names.begin(),link_names.end(),link_name) - link_names.begin();
@@ -137,21 +141,24 @@ ompl::base::ROPPathLengthOptimizationObjective::ROPPathLengthOptimizationObjecti
         }
         m_test_points.insert({link_name,link_pts});
     }
+    std::cout<<"n_pts:"<<n_pts<<std::endl;
     m_points.resize(n_pts);
 
-    if (!nh_.getParam("computation_step", step_))
+    if (!nh_.getParam("/ROPE/computation_step", step_))
     {
-        ROS_ERROR("%s/computation_step not defined", nh_.getNamespace().c_str());
+        ROS_ERROR("/ROPE/computation_step not defined");
     }
     std::string opv_topic = "rop_opvs";
-    if (!nh_.getParam("rop_opv_topic", opv_topic))
+    if (!nh_.getParam("/ROPE/rop_opv_topic", opv_topic))
     {
-        ROS_WARN_STREAM("/rop_opv_topic not defined, using "<<opv_topic);
+        ROS_WARN_STREAM("/ROPE/rop_opv_topic not defined, using "<<opv_topic);
     }
 
     WorkcellGrid();
 
-    sub_opvs = nh_.subscribe<rop_planning::opv_array_msg>(opv_topic,1,&ROPMetrics::opvs_callback,this);
+    sub_opvs = nh_.subscribe<rop_msgs::opv_array_msg>(opv_topic,1,&ompl::base::ROPPathLengthOptimizationObjective::opvs_callback,this);
+
+    ss = si_->getStateSpace();
 }
 
 void ompl::base::ROPPathLengthOptimizationObjective::WorkcellGrid(void)
@@ -159,20 +166,20 @@ void ompl::base::ROPPathLengthOptimizationObjective::WorkcellGrid(void)
   
   std::vector<double> ws_lb_param;
 
-  if (nh_.getParam("workspace_lower_bounds_xyz",ws_lb_param))
+  if (nh_.getParam("/ROPE/workspace_lower_bounds_xyz",ws_lb_param))
   {
     for (int i=0;i<3;i++) workspace_lb[i] = ws_lb_param[i];
   } else {
-    ROS_DEBUG("workspace_lower_bounds_xyz is not set, default={-1,-1,0.5}");
+    ROS_DEBUG("/ROPE/workspace_lower_bounds_xyz is not set, default={-1,-1,0.5}");
   }  
 
   std::vector<double> ws_ub_param;
 
-  if (nh_.getParam("workspace_upper_bounds_xyz",ws_ub_param))
+  if (nh_.getParam("/ROPE/workspace_upper_bounds_xyz",ws_ub_param))
   {
     for (int i=0;i<3;i++) workspace_ub[i] = ws_ub_param[i];
   } else {
-    ROS_DEBUG("workspace_lower_bounds_xyz is not set, default={1,1,2.5}");
+    ROS_DEBUG("/ROPE/workspace_lower_bounds_xyz is not set, default={1,1,2.5}");
   }
   m_inv_resolution=1/m_resolution;
   std::vector<int> npnt;
@@ -186,10 +193,10 @@ void ompl::base::ROPPathLengthOptimizationObjective::WorkcellGrid(void)
   m_npnt=npnt;
 }
 
-void ompl::base::ROPPathLengthOptimizationObjective::opvs_callback(const rop_planning::opv_array_msg::ConstPtr& msg)
+void ompl::base::ROPPathLengthOptimizationObjective::opvs_callback(const rop_msgs::opv_array_msg::ConstPtr& msg)
 {
   m_occupancy.setConstant(1.0f);
-  for (rop_planning::opv_msg opv:msg->opv_array) {
+  for (rop_msgs::opv_msg opv:msg->opv_array) {
     //descritize OPV
     Eigen::Tensor<double,3> occup(m_npnt[0],m_npnt[1],m_npnt[2]);
     occup.setConstant(1.0f);
@@ -260,7 +267,7 @@ void ompl::base::ROPPathLengthOptimizationObjective::opvs_callback(const rop_pla
 
 }
 
-double ompl::base::ROPPathLengthOptimizationObjective::totalROP(const std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d> >& points)
+double ompl::base::ROPPathLengthOptimizationObjective::totalROP(const std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d> >& points) const
 {
   double total_rop=1.0;
   double ix;
@@ -297,7 +304,7 @@ double ompl::base::ROPPathLengthOptimizationObjective::totalROP(const std::vecto
 }
 
 
-double ompl::base::ROPPathLengthOptimizationObjective::occupiedROPMultiplier(const Eigen::VectorXd &q)
+double ompl::base::ROPPathLengthOptimizationObjective::occupiedROPMultiplier(Eigen::VectorXd q) const
 {
   unsigned ipnt=0;
   m_transformations=chain->getTransformations(q);
@@ -317,26 +324,24 @@ double ompl::base::ROPPathLengthOptimizationObjective::occupiedROPMultiplier(con
   return totalROP(m_points);
 }
 
-ompl::base::Cost ompl::base::ROPPathLengthOptimizationObjective::motionCost(const State *state1, const State *state1) const
+ompl::base::Cost ompl::base::ROPPathLengthOptimizationObjective::motionCost(const State *s1, const State *s2) const
 {
-    const auto *cstate1 = state1->as<StateType>();
-    const auto *cstate2 = state2->as<StateType>();
 
-    const double *s1 = static_cast<const StateType *>(state1)->values;
-    const double *s2 = static_cast<const StateType *>(state2)->values;
+    const double *s1i = static_cast<const ompl::base::RealVectorStateSpace::StateType *>(s1)->values;
+    const double *s2i = static_cast<const ompl::base::RealVectorStateSpace::StateType *>(s2)->values;
 
-    int dimension_ = state1->getDimension();
     Eigen::VectorXd p(dimension_);
     Eigen::VectorXd c(dimension_);
     for (unsigned int i = 0; i < dimension_; ++i)
     {   
-        p[i] = s1++;
-        c[i] = s2++;
+        p[i] = (*s1i++);
+        c[i] = (*s2i++);
     }
-    return Cost(rop_cost(p,c));
+    double cost = rop_cost(p,c);
+    return Cost(cost);
 }
 
-double ompl::base::ROPPathLengthOptimizationObjective::rop_cost(const Eigen::VectorXd& parent, const Eigen::VectorXd& new_node)
+double ompl::base::ROPPathLengthOptimizationObjective::rop_cost(Eigen::VectorXd parent, Eigen::VectorXd new_node) const
 {    
   double length = (new_node - parent).norm();
   if (length < 1e-6)

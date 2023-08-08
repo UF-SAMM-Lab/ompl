@@ -38,6 +38,7 @@
 #define OMPL_BASE_OBJECTIVES_ROP_PATH_LENGTH_OPTIMIZATION_OBJECTIVE_
 
 #include "ompl/base/OptimizationObjective.h"
+#include "ompl/base/spaces/RealVectorStateSpace.h"
 #include <Eigen/Core>
 #include <ros/ros.h>
 #include <unsupported/Eigen/CXX11/Tensor>
@@ -76,15 +77,15 @@ namespace ompl
                                                          unsigned int maxNumberCalls) const override;
 
                 
-            Eigen::Tensor<double,3> m_occupancy;
-            Eigen::Vector3d workspace_lb={-1,-1,0.5};
-            Eigen::Vector3d workspace_ub={1,1,2.5};
-            std::vector<int> m_npnt;
+            mutable Eigen::Tensor<double,3> m_occupancy;
+            mutable Eigen::Vector3d workspace_lb={-1,-1,0.5};
+            mutable Eigen::Vector3d workspace_ub={1,1,2.5};
+            mutable std::vector<int> m_npnt;
             rosdyn::ChainPtr chain;
             std::vector<std::string> link_names;
-            std::vector<Eigen::Affine3d,Eigen::aligned_allocator<Eigen::Affine3d>> m_transformations;
-            std::map<std::string,std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d> >> m_test_points;
-            std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d> > m_points;
+            mutable std::vector<Eigen::Affine3d,Eigen::aligned_allocator<Eigen::Affine3d>> m_transformations;
+            mutable std::map<std::string,std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d> >> m_test_points;
+            mutable std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d> > m_points;
             std::vector<std::string> links_to_check;
             double step_;
             double m_resolution=0.05;
@@ -92,11 +93,13 @@ namespace ompl
             ros::NodeHandle nh_;
             double nu_;
             void WorkcellGrid(void);
-            void opvs_callback(const rop_planning::opv_array_msg::ConstPtr& msg);
-            double totalROP(const std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d> >& points);
-            double occupiedROPMultiplier(const Eigen::VectorXd &q);
-            double rop_cost(const Eigen::VectorXd& parent, const Eigen::VectorXd& new_node);
+            void opvs_callback(const rop_msgs::opv_array_msg::ConstPtr& msg);
+            double totalROP(const std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d> >& points) const;
+            double occupiedROPMultiplier(Eigen::VectorXd q) const;
+            double rop_cost(Eigen::VectorXd parent, Eigen::VectorXd new_node) const;
             double m_inv_resolution;
+            int dimension_=0;
+            StateSpacePtr ss;
         };
     }
 }
