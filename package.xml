@@ -20,11 +20,17 @@
   <build_depend>pkg-config</build_depend>
   <build_depend>opende</build_depend>
   <build_depend>libflann-dev</build_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>rosdyn_core</build_depend>
+  <build_depend>rop_msgs</build_depend>
 
   <exec_depend>boost</exec_depend>
   <exec_depend>eigen</exec_depend>
   <exec_depend>opende</exec_depend>
   <exec_depend>libflann-dev</exec_depend>
+  <exec_depend>roscpp</exec_depend>
+  <exec_depend>rosdyn_core</exec_depend>
+  <exec_depend>rop_msgs</exec_depend>
 
   <export>
     <build_type>cmake</build_type>

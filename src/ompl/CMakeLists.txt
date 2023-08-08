@@ -1,3 +1,13 @@
+find_package(catkin REQUIRED COMPONENTS
+  roscpp
+  rosdyn_core
+  rop_msgs
+)
+
+include_directories(
+  ${catkin_INCLUDE_DIRS}
+)
+
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/config.h.in" "${CMAKE_CURRENT_BINARY_DIR}/config.h")
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/config.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/ompl"
@@ -54,12 +64,14 @@ if(MSVC)
 else(MSVC)
     add_library(ompl SHARED ${OMPL_SOURCE_CODE})
 endif(MSVC)
+add_dependencies(ompl ${catkin_EXPORTED_TARGETS})
 target_link_libraries(ompl
     ${OMPL_LINK_LIBRARIES}
     ${Boost_SERIALIZATION_LIBRARY}
     ${Boost_FILESYSTEM_LIBRARY}
     ${Boost_SYSTEM_LIBRARY}
-    ${CMAKE_THREAD_LIBS_INIT})
+    ${CMAKE_THREAD_LIBS_INIT}
+    ${catkin_LIBRARIES})
 
 if (OMPL_EXTENSION_ODE)
     if (NOT CMAKE_VERSION VERSION_LESS 3.13)

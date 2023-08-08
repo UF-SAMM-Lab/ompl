@@ -173,6 +173,12 @@ if(PYTHON_FOUND AND NOT Boost_VERSION_STRING VERSION_LESS "1.63.0")
     endif()
 endif()
 
+find_package(catkin REQUIRED COMPONENTS
+roscpp
+rosdyn_core
+rop_msgs
+)
+
 # R is needed for running Planner Arena locally
 find_program(R_EXEC R)
 
