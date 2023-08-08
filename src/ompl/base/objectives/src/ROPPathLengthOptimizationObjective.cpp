@@ -128,12 +128,14 @@ ompl::base::ROPPathLengthOptimizationObjective::ROPPathLengthOptimizationObjecti
     for (std::string link_name:links_to_check) {
         int it = std::find(link_names.begin(),link_names.end(),link_name) - link_names.begin();
         Eigen::Affine3d t_tip = m_transformations.at(it);
+        std::cout<<t_tip.translation().transpose()<<std::endl;
         std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>> link_pts;
         link_pts.emplace_back(t_tip.translation());
         if (it>0) {
         Eigen::Affine3d t_start = m_transformations.at(it-1);
         Eigen::Vector3d diff = t_tip.translation()-t_start.translation();
         int npts = std::ceil(diff.norm()*m_inv_resolution);
+        std::cout<<"npts:"<<npts<<std::endl;
         for (int i=1;i<npts;i++) {
             link_pts.emplace_back(t_start.translation()+double(i/npts)*diff);
             n_pts++;
