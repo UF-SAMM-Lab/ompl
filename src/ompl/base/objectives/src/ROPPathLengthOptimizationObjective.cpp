@@ -111,7 +111,10 @@ ompl::base::ROPPathLengthOptimizationObjective::ROPPathLengthOptimizationObjecti
     {
         ROS_WARN_STREAM("/ROPE/rop_resolution not defined, using "<<m_resolution);
     }
-    
+    // std::cout<<"m_resolution:"<<m_resolution<<std::endl;
+    m_inv_resolution=1/m_resolution;
+    // std::cout<<"m_inv_resolution:"<<m_inv_resolution<<std::endl;
+
     Eigen::Vector3d grav;
     grav << 0, 0, -9.806;
     chain = rosdyn::createChain(robo_model, base_frame_, tool_frame, grav);
@@ -123,27 +126,30 @@ ompl::base::ROPPathLengthOptimizationObjective::ROPPathLengthOptimizationObjecti
     q.resize(dimension_);
     q.setZero();
     m_transformations=chain->getTransformations(q);
-    std::cout<<m_transformations.size()<<std::endl;
+    // std::cout<<m_transformations.size()<<std::endl;
     int n_pts = 0;
     for (std::string link_name:links_to_check) {
         int it = std::find(link_names.begin(),link_names.end(),link_name) - link_names.begin();
-        Eigen::Affine3d t_tip = m_transformations.at(it);
-        std::cout<<t_tip.translation().transpose()<<std::endl;
+        Eigen::Affine3d t_start = m_transformations.at(it);
+        // std::cout<<"t_start:"<<t_start.translation().transpose()<<std::endl;
         std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>> link_pts;
-        link_pts.emplace_back(t_tip.translation());
-        if (it>0) {
-        Eigen::Affine3d t_start = m_transformations.at(it-1);
-        Eigen::Vector3d diff = t_tip.translation()-t_start.translation();
-        int npts = std::ceil(diff.norm()*m_inv_resolution);
-        std::cout<<"npts:"<<npts<<std::endl;
-        for (int i=1;i<npts;i++) {
-            link_pts.emplace_back(t_start.translation()+double(i/npts)*diff);
-            n_pts++;
-        }
+        link_pts.emplace_back(t_start.translation());
+        n_pts++;
+        if (it<m_transformations.size()-1) {
+          Eigen::Affine3d t_tip = m_transformations.at(it+1);
+          // std::cout<<"t_tip:"<<t_tip.translation().transpose()<<std::endl;
+          Eigen::Vector3d diff = t_tip.translation()-t_start.translation();
+          // std::cout<<"diff.norm():"<<diff.norm()<<std::endl;
+          int npts = std::ceil(diff.norm()*m_inv_resolution);
+          // std::cout<<"npts:"<<npts<<std::endl;
+          for (int i=1;i<npts;i++) {
+              link_pts.emplace_back(t_start.translation()+double(i/npts)*diff);
+              n_pts++;
+          }
         }
         m_test_points.insert({link_name,link_pts});
     }
-    std::cout<<"n_pts:"<<n_pts<<std::endl;
+    // std::cout<<"n_pts:"<<n_pts<<std::endl;
     m_points.resize(n_pts);
 
     if (!nh_.getParam("/ROPE/computation_step", step_))
@@ -158,9 +164,9 @@ ompl::base::ROPPathLengthOptimizationObjective::ROPPathLengthOptimizationObjecti
 
     WorkcellGrid();
 
-    sub_opvs = nh_.subscribe<rop_msgs::opv_array_msg>(opv_topic,1,&ompl::base::ROPPathLengthOptimizationObjective::opvs_callback,this);
+    // sub_opvs = nh_.subscribe<rop_msgs::opv_array_msg>(opv_topic,1,&ompl::base::ROPPathLengthOptimizationObjective::opvs_callback,this);
 
-    ss = si_->getStateSpace();
+    // ss = si_->getStateSpace();
 }
 
 void ompl::base::ROPPathLengthOptimizationObjective::WorkcellGrid(void)
@@ -183,10 +189,9 @@ void ompl::base::ROPPathLengthOptimizationObjective::WorkcellGrid(void)
   } else {
     ROS_DEBUG("/ROPE/workspace_lower_bounds_xyz is not set, default={1,1,2.5}");
   }
-  m_inv_resolution=1/m_resolution;
   std::vector<int> npnt;
   for (int i=0;i<3;i++) {
-    npnt.push_back(std::ceil((workspace_ub[i]-workspace_lb[i])*m_inv_resolution));
+    npnt.push_back(std::ceil((workspace_ub[i]-workspace_lb[i])*m_inv_resolution)+1);
     assert(npnt.back()>0);
   }
   // m_voxel_volume=m_resolution * m_resolution * m_resolution;
@@ -280,17 +285,17 @@ double ompl::base::ROPPathLengthOptimizationObjective::totalROP(const std::vecto
   for (const Eigen::Vector3d& p: points)
   {
     ix=(p(0)-workspace_lb(0))*m_inv_resolution;
-    if ( (ix<0) || (ix>=m_npnt[0]))
+    if ( (ix<0) || (int(std::ceil(ix))>=m_npnt[0]))
       continue;
 
     iy=(p(1)-workspace_lb(1))*m_inv_resolution;
-    if ( (iy<0) || (iy>=m_npnt[1]))
+    if ( (iy<0) || (int(std::ceil(iy))>=m_npnt[1]))
       continue;
 
     iz=(p(2)-workspace_lb(2))*m_inv_resolution;
-    if ( (iz<0) || (iz>=m_npnt[2]))
+    if ( (iz<0) || (int(std::ceil(iz))>=m_npnt[2]))
       continue;
-
+    // std::cout<<"ix:"<<ix<<",iy:"<<iy<<",iz:"<<iz<<std::endl;
     double prob_success=            m_occupancy(int(std::floor(ix)),int(std::floor(iy)),int(std::floor(iz) ));
     prob_success=std::min(prob_success,m_occupancy(int(std::floor(ix)),int(std::floor(iy)),int(std::ceil(iz)  )));
     prob_success=std::min(prob_success,m_occupancy(int(std::floor(ix)),int(std::ceil(iy) ),int(std::floor(iz) )));
@@ -317,8 +322,10 @@ double ompl::base::ROPPathLengthOptimizationObjective::occupiedROPMultiplier(Eig
       int it = il-link_names.begin();
       const Eigen::Affine3d& t= m_transformations.at(it);
       const auto& pnts= m_test_points.at(link_name);
+      // std::cout<<"pnts:"<<pnts.size()<<std::endl;
       for (unsigned int ip=0;ip<pnts.size();ip++)
       {
+        // std::cout<<"ipnt:"<<ipnt<<","<<m_points.size()<<std::endl;
         m_points.at(ipnt++)=t*pnts.at(ip);
       }
     }
