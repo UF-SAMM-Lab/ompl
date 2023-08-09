@@ -93,13 +93,14 @@ namespace ompl
             ros::NodeHandle nh_;
             double nu_;
             void WorkcellGrid(void);
-            void opvs_callback(const rop_msgs::opv_array_msg::ConstPtr& msg);
+            void opvs_callback(const std::vector<double> &opv);
             double totalROP(const std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d> >& points) const;
             double occupiedROPMultiplier(Eigen::VectorXd q) const;
             double rop_cost(Eigen::VectorXd parent, Eigen::VectorXd new_node) const;
             double m_inv_resolution;
             int dimension_=0;
             StateSpacePtr ss;
+            std::vector<double> opvs_array;
         };
     }
 }

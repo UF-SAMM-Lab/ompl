@@ -156,13 +156,25 @@ ompl::base::ROPPathLengthOptimizationObjective::ROPPathLengthOptimizationObjecti
     {
         ROS_ERROR("/ROPE/computation_step not defined");
     }
-    std::string opv_topic = "rop_opvs";
-    if (!nh_.getParam("/ROPE/rop_opv_topic", opv_topic))
-    {
-        ROS_WARN_STREAM("/ROPE/rop_opv_topic not defined, using "<<opv_topic);
-    }
+    // std::string opv_topic = "rop_opvs";
+    // if (!nh_.getParam("/ROPE/rop_opv_topic", opv_topic))
+    // {
+    //     ROS_WARN_STREAM("/ROPE/rop_opv_topic not defined, using "<<opv_topic);
+    // }
 
     WorkcellGrid();
+    std::cout<<"reading opvs"<<std::endl;
+    if (!nh_.hasParam("/ROPE/ovps"))
+    {
+        ROS_WARN_STREAM("no opvs in parameter /ROPE/ovps");
+    } else 
+    {
+          nh_.getParam("/ROPE/ovps", opvs_array);
+    }
+    std::cout<<opvs_array.size()<<std::endl;
+    if (!opvs_array.empty()) {
+        opvs_callback(opvs_array);
+    }
 
     // sub_opvs = nh_.subscribe<rop_msgs::opv_array_msg>(opv_topic,1,&ompl::base::ROPPathLengthOptimizationObjective::opvs_callback,this);
 
@@ -200,21 +212,21 @@ void ompl::base::ROPPathLengthOptimizationObjective::WorkcellGrid(void)
   m_npnt=npnt;
 }
 
-void ompl::base::ROPPathLengthOptimizationObjective::opvs_callback(const rop_msgs::opv_array_msg::ConstPtr& msg)
+void ompl::base::ROPPathLengthOptimizationObjective::opvs_callback(const std::vector<double> &opv)
 {
   m_occupancy.setConstant(1.0f);
-  for (rop_msgs::opv_msg opv:msg->opv_array) {
+  for (int o=0;o<opv.size();o+=13) {
     //descritize OPV
     Eigen::Tensor<double,3> occup(m_npnt[0],m_npnt[1],m_npnt[2]);
     occup.setConstant(1.0f);
     Eigen::Vector3d near_pt_1;
-    for (int i=0;i<3;i++) near_pt_1[i]=opv.near_pt_1[i];
+    for (int i=0;i<3;i++) near_pt_1[i]=opv[i+o*13];
     Eigen::Vector3d far_pt_1;
-    for (int i=0;i<3;i++) far_pt_1[i]=opv.far_pt_1[i];
+    for (int i=0;i<3;i++) far_pt_1[i]=opv[i+o*13+3];
     Eigen::Vector3d near_pt_2;
-    for (int i=0;i<3;i++) near_pt_2[i]=opv.near_pt_2[i];
+    for (int i=0;i<3;i++) near_pt_2[i]=opv[i+o*13+6];
     Eigen::Vector3d far_pt_2;
-    for (int i=0;i<3;i++) far_pt_2[i]=opv.far_pt_2[i];
+    for (int i=0;i<3;i++) far_pt_2[i]=opv[i+o*13+9];
 
     Eigen::Vector3d pts1_delta = far_pt_1-near_pt_1;
     Eigen::Vector3d pts2_delta = far_pt_2-near_pt_2;
@@ -240,31 +252,31 @@ void ompl::base::ROPPathLengthOptimizationObjective::opvs_callback(const rop_msg
             continue;
           if ( (iz<0) || (iz>=m_npnt[2]))
             continue;
-
+          double prob_successful_passage=opv[o*13+12];
           occup(int(std::floor(ix)),
               int(std::floor(iy)),
-              int(std::floor(iz)))=opv.prob_successful_passage;
+              int(std::floor(iz)))=prob_successful_passage;
           occup(int(std::floor(ix)),
               int(std::floor(iy)),
-              int(std::ceil(iz)))=opv.prob_successful_passage;
+              int(std::ceil(iz)))=prob_successful_passage;
           occup(int(std::floor(ix)),
               int(std::ceil(iy)),
-              int(std::floor(iz)))=opv.prob_successful_passage;
+              int(std::floor(iz)))=prob_successful_passage;
           occup(int(std::floor(ix)),
               int(std::ceil(iy)),
-              int(std::ceil(iz)))=opv.prob_successful_passage;
+              int(std::ceil(iz)))=prob_successful_passage;
           occup(int(std::ceil(ix)),
               int(std::floor(iy)),
-              int(std::floor(iz)))=opv.prob_successful_passage;
+              int(std::floor(iz)))=prob_successful_passage;
           occup(int(std::ceil(ix)),
               int(std::floor(iy)),
-              int(std::ceil(iz)))=opv.prob_successful_passage;
+              int(std::ceil(iz)))=prob_successful_passage;
           occup(int(std::ceil(ix)),
               int(std::ceil(iy)),
-              int(std::floor(iz)))=opv.prob_successful_passage;
+              int(std::floor(iz)))=prob_successful_passage;
           occup(int(std::ceil(ix)),
               int(std::ceil(iy)),
-              int(std::ceil(iz)))=opv.prob_successful_passage;
+              int(std::ceil(iz)))=prob_successful_passage;
         }
       }
     }
