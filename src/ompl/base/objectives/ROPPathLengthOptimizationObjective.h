@@ -43,6 +43,7 @@
 #include <ros/ros.h>
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <geometry_msgs/PoseArray.h>
+#include <geometry_msgs/Point32.h>
 #include <sensor_msgs/PointCloud.h>
 #include <rosdyn_core/primitives.h>
 #include <rop_msgs/opv_array_msg.h>
@@ -87,7 +88,7 @@ namespace ompl
             mutable std::map<std::string,std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d> >> m_test_points;
             mutable std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d> > m_points;
             std::vector<std::string> links_to_check;
-            double step_;
+            double step_=0.1;
             double m_resolution=0.05;
             ros::Subscriber sub_opvs;
             ros::NodeHandle nh_;
@@ -101,6 +102,8 @@ namespace ompl
             int dimension_=0;
             StateSpacePtr ss;
             std::vector<double> opvs_array;
+            ros::Publisher pt_cloud_pub;
+            ros::Publisher pts_pub;
         };
     }
 }

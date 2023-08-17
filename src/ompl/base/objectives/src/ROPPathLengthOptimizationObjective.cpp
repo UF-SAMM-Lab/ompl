@@ -82,6 +82,8 @@ ompl::base::ROPPathLengthOptimizationObjective::ROPPathLengthOptimizationObjecti
 
     // name="rop metrics";
 
+    pt_cloud_pub = nh_.advertise<sensor_msgs::PointCloud>("/rope_cloud",1);
+    pts_pub = nh_.advertise<sensor_msgs::PointCloud>("/rope_points",1);
     urdf::Model robo_model;
     robo_model.initParam("robot_description");
     std::string base_frame_ = "world";
@@ -164,17 +166,20 @@ ompl::base::ROPPathLengthOptimizationObjective::ROPPathLengthOptimizationObjecti
 
     WorkcellGrid();
     std::cout<<"reading opvs"<<std::endl;
-    if (!nh_.hasParam("/ROPE/ovps"))
+    if (!nh_.hasParam("/ROPE/opvs"))
     {
-        ROS_WARN_STREAM("no opvs in parameter /ROPE/ovps");
+        ROS_WARN_STREAM("no opvs in parameter /ROPE/opvs");
     } else 
     {
-          nh_.getParam("/ROPE/ovps", opvs_array);
+      nh_.getParam("/ROPE/opvs", opvs_array);
+      std::cout<<opvs_array.size()<<std::endl;
+      if (opvs_array.size()>1) {
+          opvs_callback(opvs_array);
+      } else {
+        ROS_WARN_STREAM("empty opvs list in parameter /ROPE/opvs");
+      }
     }
-    std::cout<<opvs_array.size()<<std::endl;
-    if (!opvs_array.empty()) {
-        opvs_callback(opvs_array);
-    }
+    
 
     // sub_opvs = nh_.subscribe<rop_msgs::opv_array_msg>(opv_topic,1,&ompl::base::ROPPathLengthOptimizationObjective::opvs_callback,this);
 
@@ -215,7 +220,11 @@ void ompl::base::ROPPathLengthOptimizationObjective::WorkcellGrid(void)
 void ompl::base::ROPPathLengthOptimizationObjective::opvs_callback(const std::vector<double> &opv)
 {
   m_occupancy.setConstant(1.0f);
-  for (int o=0;o<opv.size();o+=13) {
+  int num_opvs = int(opv.size()/13);
+  ROS_WARN_STREAM("num_opvs:"<<num_opvs);
+  sensor_msgs::PointCloud pts;
+  for (int o=0;o<num_opvs;o++) {
+    double prob_successful_passage=opv[o*13+12];
     //descritize OPV
     Eigen::Tensor<double,3> occup(m_npnt[0],m_npnt[1],m_npnt[2]);
     occup.setConstant(1.0f);
@@ -232,56 +241,138 @@ void ompl::base::ROPPathLengthOptimizationObjective::opvs_callback(const std::ve
     Eigen::Vector3d pts2_delta = far_pt_2-near_pt_2;
     int npts1 = std::ceil(pts1_delta.norm()*m_inv_resolution);
     int npts2 = std::ceil(pts2_delta.norm()*m_inv_resolution);
-    for (int i=0;i<=npts1;i++) {
-      Eigen::Vector3d p1 = near_pt_1+double(i/npts1)*pts1_delta;
-      for (int j=0;j<=npts2;j++) {
-        Eigen::Vector3d p2 = near_pt_2+double(j/npts2)*pts2_delta;
-        //descritize p1->p2 line
-        Eigen::Vector3d pts3_delta = p2-p1;
-        int npts3 = std::ceil(pts3_delta.norm()*m_inv_resolution);
-        for (int k=0;k<=npts3;k++)
-        {
-          Eigen::Vector3d p = p1+double(k/npts3)*pts3_delta;
-          double ix=(p(0)-workspace_lb(0))*m_inv_resolution;
-          double iy=(p(1)-workspace_lb(1))*m_inv_resolution;
-          double iz=(p(2)-workspace_lb(2))*m_inv_resolution;
+    int n_lines = std::max(npts1,npts2);
+    for (int i=0;i<=n_lines;i++) {
+      Eigen::Vector3d p1 = near_pt_1+double(i)/double(n_lines)*pts1_delta;
+      Eigen::Vector3d p2 = near_pt_2+double(i)/double(n_lines)*pts2_delta;
+      Eigen::Vector3d pts3_delta = p2-p1;
+      int npts3 = std::ceil(pts3_delta.norm()*m_inv_resolution);
+      for (int k=0;k<=npts3;k++)
+      {
+        Eigen::Vector3d p = p1+double(k)/double(npts3)*pts3_delta;
+        geometry_msgs::Point32 pt;
+        pt.x = p[0];
+        pt.y = p[1];
+        pt.z = p[2];
+        pts.points.push_back(pt);
+        double ix=(p[0]-workspace_lb[0])*m_inv_resolution;
+        double iy=(p[1]-workspace_lb[1])*m_inv_resolution;
+        double iz=(p[2]-workspace_lb[2])*m_inv_resolution;
 
-          if ( (ix<0) || (ix>=m_npnt[0]))
-            continue;
-          if ( (iy<0) || (iy>=m_npnt[1]))
-            continue;
-          if ( (iz<0) || (iz>=m_npnt[2]))
-            continue;
-          double prob_successful_passage=opv[o*13+12];
-          occup(int(std::floor(ix)),
-              int(std::floor(iy)),
-              int(std::floor(iz)))=prob_successful_passage;
-          occup(int(std::floor(ix)),
-              int(std::floor(iy)),
-              int(std::ceil(iz)))=prob_successful_passage;
-          occup(int(std::floor(ix)),
-              int(std::ceil(iy)),
-              int(std::floor(iz)))=prob_successful_passage;
-          occup(int(std::floor(ix)),
-              int(std::ceil(iy)),
-              int(std::ceil(iz)))=prob_successful_passage;
-          occup(int(std::ceil(ix)),
-              int(std::floor(iy)),
-              int(std::floor(iz)))=prob_successful_passage;
-          occup(int(std::ceil(ix)),
-              int(std::floor(iy)),
-              int(std::ceil(iz)))=prob_successful_passage;
-          occup(int(std::ceil(ix)),
-              int(std::ceil(iy)),
-              int(std::floor(iz)))=prob_successful_passage;
-          occup(int(std::ceil(ix)),
-              int(std::ceil(iy)),
-              int(std::ceil(iz)))=prob_successful_passage;
+        if ( (ix<0) || (ix>=m_npnt[0]))
+          continue;
+        if ( (iy<0) || (iy>=m_npnt[1]))
+          continue;
+        if ( (iz<0) || (iz>=m_npnt[2]))
+          continue;
+        occup(int(std::floor(ix)),
+            int(std::floor(iy)),
+            int(std::floor(iz)))=prob_successful_passage;
+        occup(int(std::floor(ix)),
+            int(std::floor(iy)),
+            int(std::ceil(iz)))=prob_successful_passage;
+        occup(int(std::floor(ix)),
+            int(std::ceil(iy)),
+            int(std::floor(iz)))=prob_successful_passage;
+        occup(int(std::floor(ix)),
+            int(std::ceil(iy)),
+            int(std::ceil(iz)))=prob_successful_passage;
+        occup(int(std::ceil(ix)),
+            int(std::floor(iy)),
+            int(std::floor(iz)))=prob_successful_passage;
+        occup(int(std::ceil(ix)),
+            int(std::floor(iy)),
+            int(std::ceil(iz)))=prob_successful_passage;
+        occup(int(std::ceil(ix)),
+            int(std::ceil(iy)),
+            int(std::floor(iz)))=prob_successful_passage;
+        occup(int(std::ceil(ix)),
+            int(std::ceil(iy)),
+            int(std::ceil(iz)))=prob_successful_passage;
+      }
+    }
+
+    // for (int i=0;i<=npts1;i++) {
+    //   Eigen::Vector3d p1 = near_pt_1+double(i)/double(npts1)*pts1_delta;
+    //   for (int j=0;j<=npts2;j++) {
+    //     Eigen::Vector3d p2 = near_pt_2+double(j)/double(npts2)*pts2_delta;
+    //     //descritize p1->p2 line
+    //     Eigen::Vector3d pts3_delta = p2-p1;
+    //     int npts3 = std::ceil(pts3_delta.norm()*0.5*m_inv_resolution);
+    //     for (int k=0;k<=npts3;k++)
+    //     {
+    //       Eigen::Vector3d p = p1+double(k)/double(npts3)*pts3_delta;
+    //       geometry_msgs::Point32 pt;
+    //       pt.x = p[0];
+    //       pt.y = p[1];
+    //       pt.z = p[2];
+    //       pts.points.push_back(pt);
+    //       double ix=(p[0]-workspace_lb[0])*m_inv_resolution;
+    //       double iy=(p[1]-workspace_lb[1])*m_inv_resolution;
+    //       double iz=(p[2]-workspace_lb[2])*m_inv_resolution;
+
+    //       if ( (ix<0) || (ix>=m_npnt[0]))
+    //         continue;
+    //       if ( (iy<0) || (iy>=m_npnt[1]))
+    //         continue;
+    //       if ( (iz<0) || (iz>=m_npnt[2]))
+    //         continue;
+    //       occup(int(std::floor(ix)),
+    //           int(std::floor(iy)),
+    //           int(std::floor(iz)))=prob_successful_passage;
+    //       occup(int(std::floor(ix)),
+    //           int(std::floor(iy)),
+    //           int(std::ceil(iz)))=prob_successful_passage;
+    //       occup(int(std::floor(ix)),
+    //           int(std::ceil(iy)),
+    //           int(std::floor(iz)))=prob_successful_passage;
+    //       occup(int(std::floor(ix)),
+    //           int(std::ceil(iy)),
+    //           int(std::ceil(iz)))=prob_successful_passage;
+    //       occup(int(std::ceil(ix)),
+    //           int(std::floor(iy)),
+    //           int(std::floor(iz)))=prob_successful_passage;
+    //       occup(int(std::ceil(ix)),
+    //           int(std::floor(iy)),
+    //           int(std::ceil(iz)))=prob_successful_passage;
+    //       occup(int(std::ceil(ix)),
+    //           int(std::ceil(iy)),
+    //           int(std::floor(iz)))=prob_successful_passage;
+    //       occup(int(std::ceil(ix)),
+    //           int(std::ceil(iy)),
+    //           int(std::ceil(iz)))=prob_successful_passage;
+    //     }
+    //   }
+    // }
+    m_occupancy=(m_occupancy*occup);
+  }
+  if (!pts.points.empty()) {
+    pts.header.frame_id="world";
+    pts.header.stamp=ros::Time::now();
+    pts_pub.publish(pts);
+    std::cout<<pts<<std::endl;
+  }
+
+  sensor_msgs::PointCloud pt_cloud;  
+  pt_cloud.header.frame_id="world";
+  pt_cloud.header.stamp=ros::Time::now();
+  pt_cloud.channels.resize(1);
+  pt_cloud.channels.at(0).name="prob_successful_passage";
+  for (int i=0;i<m_npnt[0];i++) {
+    for (int j=0;j<m_npnt[1];j++) {
+      for (int k=0;k<m_npnt[2];k++) {
+        if (m_occupancy(i,j,k)<1.0) {
+          geometry_msgs::Point32 pt;
+          pt.x = workspace_lb(0)+(double(i)+0.5)*m_resolution;
+          pt.y = workspace_lb(1)+(double(j)+0.5)*m_resolution;
+          pt.z = workspace_lb(2)+(double(k)+0.5)*m_resolution;
+          pt_cloud.points.push_back(pt);
+          pt_cloud.channels.at(0).values.push_back(1-m_occupancy(i,j,k));
         }
       }
     }
-    m_occupancy=(m_occupancy*occup);
   }
+  pt_cloud_pub.publish(pt_cloud);
   // m_occupancy = 1/m_occupancy;
 
 }
@@ -368,7 +459,7 @@ double ompl::base::ROPPathLengthOptimizationObjective::rop_cost(Eigen::VectorXd 
   if (length < 1e-6)
     return length;
 
-  double cost = 0.0;
+  double max_multiplier = 0.0;
   unsigned int nsteps = std::ceil(length / step_);
   double inv_nsteps = 1.0 / nsteps;
   double distance = length / nsteps;
@@ -377,10 +468,10 @@ double ompl::base::ROPPathLengthOptimizationObjective::rop_cost(Eigen::VectorXd 
   {
     Eigen::VectorXd q = parent + diff * istep;
     //check for intersection of voxels
-    cost += distance*occupiedROPMultiplier(q);
+    max_multiplier = std::max(occupiedROPMultiplier(q),max_multiplier);
   }
 
-  return cost;
+  return length*max_multiplier;
 }
 
 
