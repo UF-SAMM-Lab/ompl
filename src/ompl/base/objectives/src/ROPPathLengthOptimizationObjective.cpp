@@ -133,19 +133,35 @@ ompl::base::ROPPathLengthOptimizationObjective::ROPPathLengthOptimizationObjecti
     for (std::string link_name:links_to_check) {
         int it = std::find(link_names.begin(),link_names.end(),link_name) - link_names.begin();
         Eigen::Affine3d t_start = m_transformations.at(it);
-        // std::cout<<"t_start:"<<t_start.translation().transpose()<<std::endl;
+        std::cout<<"t_start:"<<t_start.translation().transpose()<<std::endl;
         std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>> link_pts;
-        link_pts.emplace_back(t_start.translation());
+        // link_pts.emplace_back(t_start.translation());
+        link_pts.emplace_back(Eigen::Vector3d(0,0,0));
         n_pts++;
         if (it<m_transformations.size()-1) {
           Eigen::Affine3d t_tip = m_transformations.at(it+1);
-          // std::cout<<"t_tip:"<<t_tip.translation().transpose()<<std::endl;
+          std::cout<<"t_tip:"<<t_tip.translation().transpose()<<std::endl;
           Eigen::Vector3d diff = t_tip.translation()-t_start.translation();
           // std::cout<<"diff.norm():"<<diff.norm()<<std::endl;
           int npts = std::ceil(diff.norm()*m_inv_resolution);
           // std::cout<<"npts:"<<npts<<std::endl;
           for (int i=1;i<npts;i++) {
-              link_pts.emplace_back(t_start.translation()+double(i/npts)*diff);
+              Eigen::Vector3d p = double(i)/double(npts)*diff;//t_start.translation()+
+              std::cout<<p.transpose()<<std::endl;
+              link_pts.emplace_back(p);
+              n_pts++;
+          }
+        } else {
+          Eigen::Vector3d t_tip = Eigen::Vector3d(0,0,0.2);//t_start.translation()+
+          std::cout<<"t_tip:"<<t_tip.transpose()<<std::endl;
+          Eigen::Vector3d diff = t_tip;//-t_start.translation();
+          // std::cout<<"diff.norm():"<<diff.norm()<<std::endl;
+          int npts = std::ceil(diff.norm()*m_inv_resolution);
+          // std::cout<<"npts:"<<npts<<std::endl;
+          for (int i=1;i<=npts;i++) {
+              Eigen::Vector3d p = double(i)/double(npts)*diff;//t_start.translation()+
+              std::cout<<p.transpose()<<std::endl;
+              link_pts.emplace_back(p);
               n_pts++;
           }
         }
@@ -177,6 +193,12 @@ ompl::base::ROPPathLengthOptimizationObjective::ROPPathLengthOptimizationObjecti
           opvs_callback(opvs_array);
       } else {
         ROS_WARN_STREAM("empty opvs list in parameter /ROPE/opvs");
+        sensor_msgs::PointCloud pt_cloud;  
+        pt_cloud.header.frame_id="world";
+        pt_cloud.header.stamp=ros::Time::now();
+        pt_cloud.channels.resize(1);
+        pt_cloud.channels.at(0).name="prob_successful_passage";
+        pt_cloud_pub.publish(pt_cloud);
       }
     }
     
@@ -350,7 +372,6 @@ void ompl::base::ROPPathLengthOptimizationObjective::opvs_callback(const std::ve
     pts.header.frame_id="world";
     pts.header.stamp=ros::Time::now();
     pts_pub.publish(pts);
-    std::cout<<pts<<std::endl;
   }
 
   sensor_msgs::PointCloud pt_cloud;  
